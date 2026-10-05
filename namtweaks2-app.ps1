@@ -56,7 +56,8 @@ public class Gauge : Control {
   public Gauge() {
     DoubleBuffered = true;
     Size = new Size(130, 160);
-    BackColor = Color.Transparent;
+    SetStyle(ControlStyles.SupportsTransparentBackColor, true);
+    BackColor = Color.FromArgb(22, 22, 36);
   }
   protected override void OnPaint(PaintEventArgs e) {
     e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
