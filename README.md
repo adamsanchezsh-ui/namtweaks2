@@ -1,9 +1,16 @@
 # namtweaks2
 
-Free, open-source gaming tweaks for Fortnite on Windows 10/11: a **GUI app** (crosshair overlay + boosters) and a **tweak script**. Original code, no keys, no obfuscation.
+Free, open-source gaming tweaks for Fortnite on Windows 10/11: a **modern dark-blue GUI app** (crosshair overlay + boosters) and a **tweak script**. Original code, no keys, no obfuscation.
 
 ## App (`namtweaks2.bat`)
-Double-click `namtweaks2.bat` and accept the admin prompt. Or download `namtweaks2.exe` from the **Actions** tab (Build exe -> Artifacts).
+
+Double-click `namtweaks2.bat` and accept the admin prompt. Or download `namtweaks2.exe` from the **Actions** tab (Build exe → Artifacts).
+
+### New modern UI
+- Deep dark theme with blue accents
+- Clean header + rounded modern buttons
+- Better spacing and readability
+- Same powerful features, just looks 10× better
 
 **Crosshair tab**
 - Overlay is click-through and always on top
@@ -14,7 +21,7 @@ Double-click `namtweaks2.bat` and accept the admin prompt. Or download `namtweak
 
 **Boosters tab**
 - **Input delay reducer**: 0.5 ms timer resolution (active while the app is open), mouse acceleration off, power throttling off, multimedia scheduler tuned
-- **Ping stabilizer**: Nagle / delayed ACK off, network throttling off, DNS flush, plus a live ping / range / loss monitor. It cannot fix a bad ISP route, it only removes local delays
+- **Ping stabilizer**: Nagle / delayed ACK off, network throttling off, DNS flush, plus a live ping / range / loss monitor
 - **Game booster**: closes the background apps you list (editable) and sets Fortnite to High priority; optional auto-boost when Fortnite starts
 - **Revert ALL**: restores your exact original values
 
