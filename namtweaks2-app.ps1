@@ -1,7 +1,7 @@
 #Requires -RunAsAdministrator
-# namtweaks2 app - modern dark-blue UI
-# crosshair overlay + input delay reducer + ping stabilizer + game booster
-Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+# namtweaks2 - modern EMTweaks-style dark UI (sidebar + cards + gauges)
+# crosshair overlay + boosters + system monitor
+Add-Type -AssemblyName System.Windows.Forms, System.Drawing, System.Management
 Add-Type -ReferencedAssemblies System.Windows.Forms, System.Drawing -TypeDefinition @'
 using System;
 using System.Drawing;
@@ -49,11 +49,102 @@ public class Xhair : Form {
   }
 }
 
-// Modern rounded button
+// Circular gauge control
+public class Gauge : Control {
+  public float Value = 0; // 0-100
+  public Color Accent = Color.FromArgb(99, 102, 241);
+  public string Label = "CPU";
+  public Gauge() {
+    DoubleBuffered = true;
+    Size = new Size(140, 160);
+    BackColor = Color.Transparent;
+  }
+  protected override void OnPaint(PaintEventArgs e) {
+    e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+    int size = Math.Min(Width, Height - 30) - 10;
+    int x = (Width - size) / 2;
+    int y = 8;
+    var rect = new Rectangle(x, y, size, size);
+    float start = -90;
+    float sweep = 360f * Math.Min(100, Math.Max(0, Value)) / 100f;
+
+    using (var bg = new Pen(Color.FromArgb(40, 40, 60), 10))
+    using (var fg = new Pen(Accent, 10) { StartCap = LineCap.Round, EndCap = LineCap.Round }) {
+      e.Graphics.DrawArc(bg, rect, 0, 360);
+      if (sweep > 0.5f) e.Graphics.DrawArc(fg, rect, start, sweep);
+    }
+    string pct = ((int)Value).ToString() + "%";
+    using (var f = new Font("Segoe UI Semibold", 16f))
+    using (var b = new SolidBrush(Color.White)) {
+      var sz = e.Graphics.MeasureString(pct, f);
+      e.Graphics.DrawString(pct, f, b, x + (size - sz.Width) / 2, y + (size - sz.Height) / 2 - 2);
+    }
+    using (var f2 = new Font("Segoe UI", 9f))
+    using (var b2 = new SolidBrush(Color.FromArgb(160, 160, 180))) {
+      var sz2 = e.Graphics.MeasureString(Label, f2);
+      e.Graphics.DrawString(Label, f2, b2, (Width - sz2.Width) / 2, y + size + 6);
+    }
+  }
+}
+
+// Modern nav button
+public class NavBtn : Button {
+  public bool Active = false;
+  public Color Accent = Color.FromArgb(99, 102, 241);
+  public NavBtn() {
+    FlatStyle = FlatStyle.Flat;
+    FlatAppearance.BorderSize = 0;
+    ForeColor = Color.FromArgb(180, 180, 200);
+    Font = new Font("Segoe UI Semibold", 10f);
+    TextAlign = ContentAlignment.MiddleLeft;
+    Cursor = Cursors.Hand;
+    Height = 42;
+    Padding = new Padding(16, 0, 0, 0);
+  }
+  protected override void OnPaint(PaintEventArgs e) {
+    e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+    var bg = Active ? Color.FromArgb(35, 35, 55) : Color.Transparent;
+    using (var b = new SolidBrush(bg)) e.Graphics.FillRectangle(b, ClientRectangle);
+    if (Active) {
+      using (var p = new SolidBrush(Accent))
+        e.Graphics.FillRectangle(p, 0, 8, 4, Height - 16);
+    }
+    TextRenderer.DrawText(e.Graphics, Text, Font, new Rectangle(18, 0, Width - 20, Height),
+      Active ? Color.White : ForeColor, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+  }
+}
+
+// Rounded card panel
+public class Card : Panel {
+  public int Radius = 12;
+  public Card() {
+    DoubleBuffered = true;
+    BackColor = Color.FromArgb(22, 22, 36);
+  }
+  protected override void OnPaint(PaintEventArgs e) {
+    e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+    using (var path = RoundRect(ClientRectangle, Radius))
+    using (var b = new SolidBrush(BackColor)) {
+      e.Graphics.FillPath(b, path);
+    }
+  }
+  static GraphicsPath RoundRect(Rectangle r, int rad) {
+    var p = new GraphicsPath();
+    int d = rad * 2;
+    p.AddArc(r.X, r.Y, d, d, 180, 90);
+    p.AddArc(r.Right - d - 1, r.Y, d, d, 270, 90);
+    p.AddArc(r.Right - d - 1, r.Bottom - d - 1, d, d, 0, 90);
+    p.AddArc(r.X, r.Bottom - d - 1, d, d, 90, 90);
+    p.CloseFigure();
+    return p;
+  }
+}
+
+// Modern button
 public class ModernButton : Button {
-  public Color NormalColor = Color.FromArgb(30, 64, 120);
-  public Color HoverColor  = Color.FromArgb(37, 99, 180);
-  public Color PressColor  = Color.FromArgb(25, 80, 160);
+  public Color NormalColor = Color.FromArgb(79, 70, 229);
+  public Color HoverColor  = Color.FromArgb(99, 102, 241);
+  public Color PressColor  = Color.FromArgb(67, 56, 202);
   private bool hover = false, press = false;
   public ModernButton() {
     FlatStyle = FlatStyle.Flat;
@@ -63,10 +154,10 @@ public class ModernButton : Button {
     Cursor = Cursors.Hand;
     BackColor = NormalColor;
   }
-  protected override void OnMouseEnter(EventArgs e) { hover = true;  Invalidate(); base.OnMouseEnter(e); }
+  protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
   protected override void OnMouseLeave(EventArgs e) { hover = false; press = false; Invalidate(); base.OnMouseLeave(e); }
-  protected override void OnMouseDown(MouseEventArgs e) { press = true;  Invalidate(); base.OnMouseDown(e); }
-  protected override void OnMouseUp(MouseEventArgs e)   { press = false; Invalidate(); base.OnMouseUp(e); }
+  protected override void OnMouseDown(MouseEventArgs e) { press = true; Invalidate(); base.OnMouseDown(e); }
+  protected override void OnMouseUp(MouseEventArgs e) { press = false; Invalidate(); base.OnMouseUp(e); }
   protected override void OnPaint(PaintEventArgs e) {
     e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
     var col = press ? PressColor : (hover ? HoverColor : NormalColor);
@@ -96,14 +187,14 @@ $AppDir = Join-Path $env:APPDATA 'namtweaks2'; $CfgFile = Join-Path $AppDir 'con
 $Dir = Join-Path $env:ProgramData 'namtweaks2'; $State = Join-Path $Dir 'backup.json'
 New-Item $AppDir, $Dir -ItemType Directory -Force | Out-Null
 
-# ---------- theme ----------
-$Bg       = [Drawing.Color]::FromArgb(10, 14, 23)      # deep dark
-$PanelBg  = [Drawing.Color]::FromArgb(18, 24, 38)      # card
-$Accent   = [Drawing.Color]::FromArgb(59, 130, 246)    # blue
-$Accent2  = [Drawing.Color]::FromArgb(37, 99, 235)
-$TextMain = [Drawing.Color]::FromArgb(226, 232, 240)
-$TextMute = [Drawing.Color]::FromArgb(148, 163, 184)
-$Border   = [Drawing.Color]::FromArgb(30, 41, 59)
+# ---------- theme (EMTweaks-like purple/dark) ----------
+$Bg       = [Drawing.Color]::FromArgb(12, 12, 20)
+$Sidebar  = [Drawing.Color]::FromArgb(18, 18, 30)
+$CardBg   = [Drawing.Color]::FromArgb(22, 22, 36)
+$Accent   = [Drawing.Color]::FromArgb(99, 102, 241)   # indigo/purple
+$Accent2  = [Drawing.Color]::FromArgb(139, 92, 246)
+$TextMain = [Drawing.Color]::FromArgb(240, 240, 250)
+$TextMute = [Drawing.Color]::FromArgb(150, 150, 170)
 $Success  = [Drawing.Color]::FromArgb(34, 197, 94)
 $Danger   = [Drawing.Color]::FromArgb(239, 68, 68)
 
@@ -171,124 +262,205 @@ function Boost-Game {
     $script:status.ForeColor = $Success
 }
 
-# ===================== UI =====================
+# ===================== MAIN FORM =====================
 $form = New-Object Windows.Forms.Form -Property @{
     Text            = 'namtweaks2'
-    ClientSize     = '420,620'
+    ClientSize     = '960,640'
     FormBorderStyle= 'FixedSingle'
     MaximizeBox    = $false
     StartPosition  = 'CenterScreen'
     BackColor      = $Bg
     Font           = New-Object Drawing.Font('Segoe UI', 9)
 }
-$form.Icon = [Drawing.SystemIcons]::Application
+try { $form.Icon = [Drawing.Icon]::ExtractAssociatedIcon("$env:SystemRoot\System32\shell32.dll") } catch {}
 
-# Header
-$header = New-Object Windows.Forms.Panel -Property @{
-    Left = 0; Top = 0; Width = 420; Height = 64
-    BackColor = $PanelBg
+# ----- SIDEBAR -----
+$side = New-Object Windows.Forms.Panel -Property @{
+    Left = 0; Top = 0; Width = 210; Height = 640; BackColor = $Sidebar
 }
-$title = New-Object Windows.Forms.Label -Property @{
-    Text = 'namtweaks2'; Left = 20; Top = 12; Width = 280; Height = 28
-    ForeColor = $TextMain; Font = New-Object Drawing.Font('Segoe UI Semibold', 16)
-}
-$subtitle = New-Object Windows.Forms.Label -Property @{
-    Text = 'Fortnite tweaks • modern UI'; Left = 20; Top = 38; Width = 280; Height = 18
-    ForeColor = $TextMute; Font = New-Object Drawing.Font('Segoe UI', 8.5)
-}
-$header.Controls.AddRange(@($title, $subtitle))
-$form.Controls.Add($header)
+$form.Controls.Add($side)
 
-# Accent line under header
-$line = New-Object Windows.Forms.Panel -Property @{
-    Left = 0; Top = 64; Width = 420; Height = 3; BackColor = $Accent
+$logo = New-Object Windows.Forms.Label -Property @{
+    Text = 'namtweaks2'; Left = 20; Top = 22; Width = 170; Height = 28
+    ForeColor = $TextMain; Font = New-Object Drawing.Font('Segoe UI Semibold', 15)
 }
-$form.Controls.Add($line)
-
-# Tabs (styled)
-$tabs = New-Object Windows.Forms.TabControl -Property @{
-    Left = 12; Top = 78; Width = 396; Height = 500
-    Font = New-Object Drawing.Font('Segoe UI Semibold', 9.5)
+$logoSub = New-Object Windows.Forms.Label -Property @{
+    Text = 'Optimization Utility'; Left = 20; Top = 50; Width = 170; Height = 18
+    ForeColor = $TextMute; Font = New-Object Drawing.Font('Segoe UI', 8)
 }
-$tabs.Appearance = 'Normal'
-$t1 = New-Object Windows.Forms.TabPage '  Crosshair  '
-$t2 = New-Object Windows.Forms.TabPage '  Boosters  '
-$t1.BackColor = $Bg; $t2.BackColor = $Bg
-$t1.ForeColor = $TextMain; $t2.ForeColor = $TextMain
-$tabs.TabPages.AddRange(@($t1, $t2))
-$form.Controls.Add($tabs)
+$side.Controls.AddRange(@($logo, $logoSub))
 
-# Status bar
+$navHome = New-Object NavBtn; $navHome.Text = '  Home'; Left = 8; Top = 100; Width = 194
+$navCross = New-Object NavBtn; $navCross.Text = '  Crosshair'; Left = 8; Top = 146; Width = 194
+$navBoost = New-Object NavBtn; $navBoost.Text = '  Boosters'; Left = 8; Top = 192; Width = 194
+$navHome.Active = $true
+$side.Controls.AddRange(@($navHome, $navCross, $navBoost))
+
 $status = New-Object Windows.Forms.Label -Property @{
-    Left = 16; Top = 588; Width = 390; Height = 24
-    Text = 'Ready'; ForeColor = $TextMute
-    Font = New-Object Drawing.Font('Segoe UI', 8.5)
+    Left = 16; Top = 600; Width = 180; Height = 30
+    Text = 'Ready'; ForeColor = $TextMute; Font = New-Object Drawing.Font('Segoe UI', 8)
 }
-$form.Controls.Add($status)
+$side.Controls.Add($status)
 
-# Helpers
-function MakeLabel($text, $x, $y, $w = 130) {
-    New-Object Windows.Forms.Label -Property @{
+# ----- CONTENT AREA -----
+$content = New-Object Windows.Forms.Panel -Property @{
+    Left = 210; Top = 0; Width = 750; Height = 640; BackColor = $Bg
+}
+$form.Controls.Add($content)
+
+# ===== HOME PAGE =====
+$pageHome = New-Object Windows.Forms.Panel -Property @{
+    Left = 0; Top = 0; Width = 750; Height = 640; BackColor = $Bg; Visible = $true
+}
+$content.Controls.Add($pageHome)
+
+$welcome = New-Object Windows.Forms.Label -Property @{
+    Text = 'Welcome back to namtweaks2'; Left = 28; Top = 24; Width = 500; Height = 32
+    ForeColor = $TextMain; Font = New-Object Drawing.Font('Segoe UI Semibold', 18)
+}
+$welcomeSub = New-Object Windows.Forms.Label -Property @{
+    Text = 'Performance, optimization and Fortnite tweaks - all in one.'; Left = 28; Top = 56; Width = 500; Height = 20
+    ForeColor = $TextMute; Font = New-Object Drawing.Font('Segoe UI', 9.5)
+}
+$pageHome.Controls.AddRange(@($welcome, $welcomeSub))
+
+# Gauges card
+$gaugeCard = New-Object Card
+$gaugeCard.Left = 28; $gaugeCard.Top = 100; $gaugeCard.Width = 460; $gaugeCard.Height = 190
+$pageHome.Controls.Add($gaugeCard)
+
+$gCpu = New-Object Gauge; $gCpu.Label = 'CPU Usage'; $gCpu.Left = 30; $gCpu.Top = 16; $gCpu.Width = 130; $gCpu.Height = 160
+$gRam = New-Object Gauge; $gRam.Label = 'RAM Usage'; $gRam.Left = 170; $gRam.Top = 16; $gRam.Width = 130; $gRam.Height = 160; $gRam.Accent = [Drawing.Color]::FromArgb(139, 92, 246)
+$gPing = New-Object Gauge; $gPing.Label = 'Ping (ms)'; $gPing.Left = 310; $gPing.Top = 16; $gPing.Width = 130; $gPing.Height = 160; $gPing.Accent = [Drawing.Color]::FromArgb(34, 197, 94)
+$gaugeCard.Controls.AddRange(@($gCpu, $gRam, $gPing))
+
+# Quick actions card
+$actCard = New-Object Card
+$actCard.Left = 510; $actCard.Top = 100; $actCard.Width = 210; $actCard.Height = 190
+$pageHome.Controls.Add($actCard)
+
+$actTitle = New-Object Windows.Forms.Label -Property @{
+    Text = 'Quick Actions'; Left = 16; Top = 16; Width = 180; Height = 22
+    ForeColor = $TextMain; Font = New-Object Drawing.Font('Segoe UI Semibold', 11)
+}
+$actCard.Controls.Add($actTitle)
+
+$btnQuickInput = New-Object ModernButton
+$btnQuickInput.Text = 'Input Reducer'; $btnQuickInput.Left = 16; $btnQuickInput.Top = 50; $btnQuickInput.Width = 178; $btnQuickInput.Height = 34
+$btnQuickInput.add_Click({ Boost-Input; $script:status.Text = 'Input reducer applied'; $script:status.ForeColor = $Success })
+$btnQuickPing = New-Object ModernButton
+$btnQuickPing.Text = 'Ping Stabilizer'; $btnQuickPing.Left = 16; $btnQuickPing.Top = 92; $btnQuickPing.Width = 178; $btnQuickPing.Height = 34
+$btnQuickPing.add_Click({ Boost-Ping; $script:status.Text = 'Ping stabilizer applied'; $script:status.ForeColor = $Success })
+$btnQuickGame = New-Object ModernButton
+$btnQuickGame.Text = 'Game Booster'; $btnQuickGame.Left = 16; $btnQuickGame.Top = 134; $btnQuickGame.Width = 178; $btnQuickGame.Height = 34
+$btnQuickGame.add_Click({ Boost-Game })
+$actCard.Controls.AddRange(@($btnQuickInput, $btnQuickPing, $btnQuickGame))
+
+# Info cards bottom
+$info1 = New-Object Card
+$info1.Left = 28; $info1.Top = 310; $info1.Width = 340; $info1.Height = 140
+$pageHome.Controls.Add($info1)
+$i1t = New-Object Windows.Forms.Label -Property @{
+    Text = 'Crosshair Overlay'; Left = 18; Top = 16; Width = 300; Height = 22
+    ForeColor = $TextMain; Font = New-Object Drawing.Font('Segoe UI Semibold', 11)
+}
+$i1d = New-Object Windows.Forms.Label -Property @{
+    Text = 'Click-through always-on-top crosshair.`nStyle, color, position fully adjustable.`nSaved automatically.'; Left = 18; Top = 46; Width = 300; Height = 70
+    ForeColor = $TextMute; Font = New-Object Drawing.Font('Segoe UI', 9)
+}
+$info1.Controls.AddRange(@($i1t, $i1d))
+
+$info2 = New-Object Card
+$info2.Left = 386; $info2.Top = 310; $info2.Width = 334; $info2.Height = 140
+$pageHome.Controls.Add($info2)
+$i2t = New-Object Windows.Forms.Label -Property @{
+    Text = 'Full Optimizer'; Left = 18; Top = 16; Width = 300; Height = 22
+    ForeColor = $TextMain; Font = New-Object Drawing.Font('Segoe UI Semibold', 11)
+}
+$i2d = New-Object Windows.Forms.Label -Property @{
+    Text = 'Power plan, Game Mode, HAGS, Nagle,`nmouse accel, Fortnite priority + more.`nEverything is fully reversible.'; Left = 18; Top = 46; Width = 300; Height = 70
+    ForeColor = $TextMute; Font = New-Object Drawing.Font('Segoe UI', 9)
+}
+$info2.Controls.AddRange(@($i2t, $i2d))
+
+$btnOpenOpt = New-Object ModernButton
+$btnOpenOpt.Text = 'Open full optimizer menu'; $btnOpenOpt.Left = 28; $btnOpenOpt.Top = 470; $btnOpenOpt.Width = 220; $btnOpenOpt.Height = 38
+$btnOpenOpt.add_Click({ Start-Process powershell -ArgumentList '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $root 'namtweaks2.ps1') })
+$pageHome.Controls.Add($btnOpenOpt)
+
+$btnRevert = New-Object ModernButton
+$btnRevert.Text = 'Revert ALL changes'; $btnRevert.Left = 260; $btnRevert.Top = 470; $btnRevert.Width = 180; $btnRevert.Height = 38
+$btnRevert.NormalColor = [Drawing.Color]::FromArgb(127, 29, 29)
+$btnRevert.HoverColor  = [Drawing.Color]::FromArgb(153, 27, 27)
+$btnRevert.PressColor  = [Drawing.Color]::FromArgb(100, 20, 20)
+$btnRevert.add_Click({ Undo-All; $script:status.Text = 'Everything reverted. Restart Windows.'; $script:status.ForeColor = $Danger })
+$pageHome.Controls.Add($btnRevert)
+
+# ===== CROSSHAIR PAGE =====
+$pageCross = New-Object Windows.Forms.Panel -Property @{
+    Left = 0; Top = 0; Width = 750; Height = 640; BackColor = $Bg; Visible = $false
+}
+$content.Controls.Add($pageCross)
+
+$cxTitle = New-Object Windows.Forms.Label -Property @{
+    Text = 'Crosshair'; Left = 28; Top = 24; Width = 300; Height = 32
+    ForeColor = $TextMain; Font = New-Object Drawing.Font('Segoe UI Semibold', 18)
+}
+$pageCross.Controls.Add($cxTitle)
+
+$cxCard = New-Object Card
+$cxCard.Left = 28; $cxCard.Top = 70; $cxCard.Width = 480; $cxCard.Height = 480
+$pageCross.Controls.Add($cxCard)
+
+function MakeLabel($parent, $text, $x, $y, $w = 140) {
+    $l = New-Object Windows.Forms.Label -Property @{
         Text = $text; Left = $x; Top = $y; Width = $w; Height = 22
         ForeColor = $TextMute; Font = New-Object Drawing.Font('Segoe UI', 9)
     }
+    $parent.Controls.Add($l); $l
 }
-function MakeNum($key, $min, $max, $x, $y) {
+function MakeNum($parent, $key, $min, $max, $x, $y) {
     $v = [Math]::Min([Math]::Max([int]$Conf[$key], $min), $max)
     $n = New-Object Windows.Forms.NumericUpDown -Property @{
         Minimum = $min; Maximum = $max; Value = $v; Tag = $key
-        Left = $x; Top = $y; Width = 90; Height = 26
-        BackColor = $PanelBg; ForeColor = $TextMain; BorderStyle = 'FixedSingle'
-        Font = New-Object Drawing.Font('Segoe UI', 9.5)
+        Left = $x; Top = $y; Width = 100; Height = 28
+        BackColor = [Drawing.Color]::FromArgb(30, 30, 48); ForeColor = $TextMain; BorderStyle = 'FixedSingle'
+        Font = New-Object Drawing.Font('Segoe UI', 10)
     }
     $n.add_ValueChanged({ $script:Conf[$this.Tag] = [int]$this.Value; Apply-Cross })
-    $n
-}
-function MakeBtn($text, $x, $y, $w, $h, $fn, $danger = $false) {
-    $b = New-Object ModernButton
-    $b.Text = $text; $b.Left = $x; $b.Top = $y; $b.Width = $w; $b.Height = $h
-    if ($danger) {
-        $b.NormalColor = [Drawing.Color]::FromArgb(127, 29, 29)
-        $b.HoverColor  = [Drawing.Color]::FromArgb(153, 27, 27)
-        $b.PressColor  = [Drawing.Color]::FromArgb(100, 20, 20)
-    }
-    $b.add_Click($fn)
-    $b
+    $parent.Controls.Add($n); $n
 }
 
-# ========== CROSSHAIR TAB ==========
-$y = 18
-$t1.Controls.Add((MakeLabel 'Style' 20 $y))
+$yy = 24
+MakeLabel $cxCard 'Style' 24 $yy
 $cb = New-Object Windows.Forms.ComboBox -Property @{
-    DropDownStyle = 'DropDownList'; Left = 150; Top = $y; Width = 210; Height = 28
-    BackColor = $PanelBg; ForeColor = $TextMain; FlatStyle = 'Flat'
-    Font = New-Object Drawing.Font('Segoe UI', 9.5)
+    DropDownStyle = 'DropDownList'; Left = 180; Top = $yy; Width = 240; Height = 28
+    BackColor = [Drawing.Color]::FromArgb(30, 30, 48); ForeColor = $TextMain; FlatStyle = 'Flat'
+    Font = New-Object Drawing.Font('Segoe UI', 10)
 }
 [void]$cb.Items.AddRange(@('Cross', 'Dot', 'Cross + Dot'))
 $cb.SelectedIndex = [int]$Conf.Style
 $cb.add_SelectedIndexChanged({ $script:Conf.Style = $this.SelectedIndex; Apply-Cross })
-$t1.Controls.Add($cb)
-$y += 42
-
-$t1.Controls.Add((MakeLabel 'Length' 20 $y))
-$t1.Controls.Add((MakeNum 'Len' 1 80 150 $y))
-$y += 38
-$t1.Controls.Add((MakeLabel 'Thickness' 20 $y))
-$t1.Controls.Add((MakeNum 'Thick' 1 12 150 $y))
-$y += 38
-$t1.Controls.Add((MakeLabel 'Gap' 20 $y))
-$t1.Controls.Add((MakeNum 'Gap' 0 60 150 $y))
-$y += 38
-$t1.Controls.Add((MakeLabel 'Position X' 20 $y))
-$nx = MakeNum 'X' -900 900 150 $y; $t1.Controls.Add($nx)
-$y += 38
-$t1.Controls.Add((MakeLabel 'Position Y' 20 $y))
-$ny = MakeNum 'Y' -900 900 150 $y; $t1.Controls.Add($ny)
-$y += 42
-
-$t1.Controls.Add((MakeLabel 'Color' 20 $y))
+$cxCard.Controls.Add($cb)
+$yy += 48
+MakeLabel $cxCard 'Length' 24 $yy
+MakeNum $cxCard 'Len' 1 80 180 $yy | Out-Null
+$yy += 42
+MakeLabel $cxCard 'Thickness' 24 $yy
+MakeNum $cxCard 'Thick' 1 12 180 $yy | Out-Null
+$yy += 42
+MakeLabel $cxCard 'Gap' 24 $yy
+MakeNum $cxCard 'Gap' 0 60 180 $yy | Out-Null
+$yy += 42
+MakeLabel $cxCard 'Position X' 24 $yy
+$nx = MakeNum $cxCard 'X' -900 900 180 $yy
+$yy += 42
+MakeLabel $cxCard 'Position Y' 24 $yy
+$ny = MakeNum $cxCard 'Y' -900 900 180 $yy
+$yy += 48
+MakeLabel $cxCard 'Color' 24 $yy
 $bc = New-Object Windows.Forms.Button -Property @{
-    Text = '  Pick color  '; Left = 150; Top = $y; Width = 120; Height = 28
+    Text = '  Pick color  '; Left = 180; Top = $yy; Width = 130; Height = 30
     FlatStyle = 'Flat'; FlatAppearance = @{ BorderSize = 0 }
     BackColor = [Drawing.ColorTranslator]::FromHtml($Conf.Color)
     ForeColor = [Drawing.Color]::White; Cursor = [Windows.Forms.Cursors]::Hand
@@ -298,123 +470,171 @@ $bc.add_Click({
     $d = New-Object Windows.Forms.ColorDialog
     if ($d.ShowDialog() -eq 'OK') {
         $script:Conf.Color = [Drawing.ColorTranslator]::ToHtml($d.Color)
-        $this.BackColor = $d.Color
-        Apply-Cross
+        $this.BackColor = $d.Color; Apply-Cross
     }
 })
-$t1.Controls.Add($bc)
-$y += 42
-
+$cxCard.Controls.Add($bc)
+$yy += 48
 $co = New-Object Windows.Forms.CheckBox -Property @{
-    Text = 'Black outline'; Left = 20; Top = $y; Width = 160; Height = 24
-    ForeColor = $TextMain; Checked = [bool]$Conf.Outline
-    FlatStyle = 'Flat'; Font = New-Object Drawing.Font('Segoe UI', 9.5)
+    Text = 'Black outline'; Left = 24; Top = $yy; Width = 160; Height = 26
+    ForeColor = $TextMain; Checked = [bool]$Conf.Outline; FlatStyle = 'Flat'
+    Font = New-Object Drawing.Font('Segoe UI', 10)
 }
 $co.add_CheckedChanged({ $script:Conf.Outline = $this.Checked; Apply-Cross })
-$t1.Controls.Add($co)
-
+$cxCard.Controls.Add($co)
 $cs = New-Object Windows.Forms.CheckBox -Property @{
-    Text = 'Show crosshair'; Left = 200; Top = $y; Width = 160; Height = 24
-    ForeColor = $TextMain; Checked = [bool]$Conf.Show
-    FlatStyle = 'Flat'; Font = New-Object Drawing.Font('Segoe UI', 9.5)
+    Text = 'Show crosshair'; Left = 200; Top = $yy; Width = 160; Height = 26
+    ForeColor = $TextMain; Checked = [bool]$Conf.Show; FlatStyle = 'Flat'
+    Font = New-Object Drawing.Font('Segoe UI', 10)
 }
 $cs.add_CheckedChanged({ $script:Conf.Show = $this.Checked; Apply-Cross })
-$t1.Controls.Add($cs)
-$y += 40
-
-$t1.Controls.Add((MakeBtn 'Center crosshair (X=0, Y=0)' 20 $y 360 36 {
-    $script:nx.Value = 0; $script:ny.Value = 0
-}))
-$y += 50
+$cxCard.Controls.Add($cs)
+$yy += 48
+$btnCenter = New-Object ModernButton
+$btnCenter.Text = 'Center (X=0, Y=0)'; $btnCenter.Left = 24; $btnCenter.Top = $yy; $btnCenter.Width = 200; $btnCenter.Height = 36
+$btnCenter.add_Click({ $script:nx.Value = 0; $script:ny.Value = 0 })
+$cxCard.Controls.Add($btnCenter)
 
 $hint = New-Object Windows.Forms.Label -Property @{
-    Left = 20; Top = $y; Width = 360; Height = 80
+    Left = 24; Top = 420; Width = 430; Height = 50
     ForeColor = $TextMute; Font = New-Object Drawing.Font('Segoe UI', 8.5)
-    Text = "Tip: click a number box and use arrow keys / mouse wheel to nudge the crosshair pixel by pixel.`nFortnite must run in Windowed Fullscreen, otherwise the overlay is hidden.`nSettings are saved automatically."
+    Text = "Use arrow keys / mouse wheel on number boxes to nudge pixel by pixel.`nFortnite must be Windowed Fullscreen."
 }
-$t1.Controls.Add($hint)
+$cxCard.Controls.Add($hint)
 
-# ========== BOOSTERS TAB ==========
-$y = 18
-$t2.Controls.Add((MakeBtn 'Input delay reducer  •  0.5 ms timer + no mouse accel' 20 $y 360 40 {
-    Boost-Input
-    $script:status.Text = 'Input delay reducer applied (active while app is open)'
-    $script:status.ForeColor = $Success
-}))
-$y += 52
+# ===== BOOSTERS PAGE =====
+$pageBoost = New-Object Windows.Forms.Panel -Property @{
+    Left = 0; Top = 0; Width = 750; Height = 640; BackColor = $Bg; Visible = $false
+}
+$content.Controls.Add($pageBoost)
 
-$t2.Controls.Add((MakeBtn 'Ping stabilizer  •  Nagle off + no throttling + flush DNS' 20 $y 360 40 {
-    Boost-Ping
-    $script:status.Text = 'Ping stabilizer applied'
-    $script:status.ForeColor = $Success
-}))
-$y += 56
+$bTitle = New-Object Windows.Forms.Label -Property @{
+    Text = 'Boosters'; Left = 28; Top = 24; Width = 300; Height = 32
+    ForeColor = $TextMain; Font = New-Object Drawing.Font('Segoe UI Semibold', 18)
+}
+$pageBoost.Controls.Add($bTitle)
 
-$t2.Controls.Add((MakeLabel 'Ping host' 20 $y 80))
+$bCard = New-Object Card
+$bCard.Left = 28; $bCard.Top = 70; $bCard.Width = 520; $bCard.Height = 500
+$pageBoost.Controls.Add($bCard)
+
+$by = 24
+$btnBI = New-Object ModernButton
+$btnBI.Text = 'Input delay reducer  •  0.5 ms timer + no mouse accel'
+$btnBI.Left = 24; $btnBI.Top = $by; $btnBI.Width = 470; $btnBI.Height = 42
+$btnBI.add_Click({ Boost-Input; $script:status.Text = 'Input delay reducer applied'; $script:status.ForeColor = $Success })
+$bCard.Controls.Add($btnBI)
+$by += 56
+$btnBP = New-Object ModernButton
+$btnBP.Text = 'Ping stabilizer  •  Nagle off + no throttling + flush DNS'
+$btnBP.Left = 24; $btnBP.Top = $by; $btnBP.Width = 470; $btnBP.Height = 42
+$btnBP.add_Click({ Boost-Ping; $script:status.Text = 'Ping stabilizer applied'; $script:status.ForeColor = $Success })
+$bCard.Controls.Add($btnBP)
+$by += 60
+MakeLabel $bCard 'Ping host' 24 $by 90
 $hostBox = New-Object Windows.Forms.TextBox -Property @{
-    Text = '1.1.1.1'; Left = 110; Top = $y; Width = 140; Height = 26
-    BackColor = $PanelBg; ForeColor = $TextMain; BorderStyle = 'FixedSingle'
-    Font = New-Object Drawing.Font('Segoe UI', 9.5)
+    Text = '1.1.1.1'; Left = 120; Top = $by; Width = 140; Height = 28
+    BackColor = [Drawing.Color]::FromArgb(30, 30, 48); ForeColor = $TextMain; BorderStyle = 'FixedSingle'
+    Font = New-Object Drawing.Font('Segoe UI', 10)
 }
-$t2.Controls.Add($hostBox)
-$y += 36
-
+$bCard.Controls.Add($hostBox)
+$by += 40
 $pingLbl = New-Object Windows.Forms.Label -Property @{
-    Left = 20; Top = $y; Width = 360; Height = 22
-    ForeColor = $Accent; Font = New-Object Drawing.Font('Segoe UI Semibold', 9.5)
+    Left = 24; Top = $by; Width = 470; Height = 24
+    ForeColor = $Accent; Font = New-Object Drawing.Font('Segoe UI Semibold', 10)
     Text = 'Ping: measuring...'
 }
-$t2.Controls.Add($pingLbl)
-$y += 36
-
-$t2.Controls.Add((MakeLabel 'Close apps (comma separated)' 20 $y 260))
-$y += 24
+$bCard.Controls.Add($pingLbl)
+$by += 40
+MakeLabel $bCard 'Close apps (comma separated)' 24 $by 300
+$by += 26
 $kb = New-Object Windows.Forms.TextBox -Property @{
-    Text = $Conf.Kill; Left = 20; Top = $y; Width = 360; Height = 28
-    BackColor = $PanelBg; ForeColor = $TextMain; BorderStyle = 'FixedSingle'
-    Font = New-Object Drawing.Font('Segoe UI', 9.5)
+    Text = $Conf.Kill; Left = 24; Top = $by; Width = 470; Height = 30
+    BackColor = [Drawing.Color]::FromArgb(30, 30, 48); ForeColor = $TextMain; BorderStyle = 'FixedSingle'
+    Font = New-Object Drawing.Font('Segoe UI', 10)
 }
 $kb.add_TextChanged({ $script:Conf.Kill = $this.Text; $script:Conf | ConvertTo-Json | Set-Content $CfgFile })
-$t2.Controls.Add($kb)
-$y += 40
-
-$t2.Controls.Add((MakeBtn 'Game booster  •  close apps + Fortnite High priority' 20 $y 360 40 {
-    Boost-Game
-}))
-$y += 48
-
+$bCard.Controls.Add($kb)
+$by += 48
+$btnBG = New-Object ModernButton
+$btnBG.Text = 'Game booster  •  close apps + Fortnite High priority'
+$btnBG.Left = 24; $btnBG.Top = $by; $btnBG.Width = 470; $btnBG.Height = 42
+$btnBG.add_Click({ Boost-Game })
+$bCard.Controls.Add($btnBG)
+$by += 56
 $ca = New-Object Windows.Forms.CheckBox -Property @{
-    Text = 'Auto-boost when Fortnite starts'; Left = 20; Top = $y; Width = 280; Height = 24
-    ForeColor = $TextMain; Checked = [bool]$Conf.Auto
-    FlatStyle = 'Flat'; Font = New-Object Drawing.Font('Segoe UI', 9.5)
+    Text = 'Auto-boost when Fortnite starts'; Left = 24; Top = $by; Width = 300; Height = 26
+    ForeColor = $TextMain; Checked = [bool]$Conf.Auto; FlatStyle = 'Flat'
+    Font = New-Object Drawing.Font('Segoe UI', 10)
 }
 $ca.add_CheckedChanged({ $script:Conf.Auto = $this.Checked; $script:Conf | ConvertTo-Json | Set-Content $CfgFile })
-$t2.Controls.Add($ca)
-$y += 40
+$bCard.Controls.Add($ca)
+$by += 50
+$btnOpt = New-Object ModernButton
+$btnOpt.Text = 'Open full optimizer menu (namtweaks2.ps1)'
+$btnOpt.Left = 24; $btnOpt.Top = $by; $btnOpt.Width = 470; $btnOpt.Height = 38
+$btnOpt.add_Click({ Start-Process powershell -ArgumentList '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $root 'namtweaks2.ps1') })
+$bCard.Controls.Add($btnOpt)
+$by += 50
+$btnRev = New-Object ModernButton
+$btnRev.Text = 'Revert ALL changes'
+$btnRev.Left = 24; $btnRev.Top = $by; $btnRev.Width = 470; $btnRev.Height = 38
+$btnRev.NormalColor = [Drawing.Color]::FromArgb(127, 29, 29)
+$btnRev.HoverColor  = [Drawing.Color]::FromArgb(153, 27, 27)
+$btnRev.PressColor  = [Drawing.Color]::FromArgb(100, 20, 20)
+$btnRev.add_Click({ Undo-All; $script:status.Text = 'Everything reverted.'; $script:status.ForeColor = $Danger })
+$bCard.Controls.Add($btnRev)
 
-$t2.Controls.Add((MakeBtn 'Open full optimizer menu (namtweaks2.ps1)' 20 $y 360 36 {
-    Start-Process powershell -ArgumentList '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $root 'namtweaks2.ps1')
-}))
-$y += 48
+# ----- Navigation -----
+function Show-Page($name) {
+    $pageHome.Visible = ($name -eq 'home')
+    $pageCross.Visible = ($name -eq 'cross')
+    $pageBoost.Visible = ($name -eq 'boost')
+    $navHome.Active = ($name -eq 'home')
+    $navCross.Active = ($name -eq 'cross')
+    $navBoost.Active = ($name -eq 'boost')
+    $navHome.Invalidate(); $navCross.Invalidate(); $navBoost.Invalidate()
+}
+$navHome.add_Click({ Show-Page 'home' })
+$navCross.add_Click({ Show-Page 'cross' })
+$navBoost.add_Click({ Show-Page 'boost' })
 
-$t2.Controls.Add((MakeBtn 'Revert ALL changes (boosters + optimizer)' 20 $y 360 36 {
-    Undo-All
-    $script:status.Text = 'Everything reverted. Restart Windows recommended.'
-    $script:status.ForeColor = $Danger
-} $true))
-
-# live ping + auto-boost
+# ----- Timers: system stats + ping + auto-boost -----
 $pg = New-Object Net.NetworkInformation.Ping
 $rtt = New-Object Collections.Generic.List[double]
 $sent = 0; $lost = 0; $boosted = $false
-$pt = New-Object Windows.Forms.Timer -Property @{ Interval = 1000 }
+
+function Get-CpuUsage {
+    try {
+        $c = Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average
+        return [double]$c.Average
+    } catch { return 0 }
+}
+function Get-RamUsage {
+    try {
+        $os = Get-CimInstance Win32_OperatingSystem
+        $used = $os.TotalVisibleMemorySize - $os.FreePhysicalMemory
+        return [math]::Round(100 * $used / $os.TotalVisibleMemorySize, 1)
+    } catch { return 0 }
+}
+
+$pt = New-Object Windows.Forms.Timer -Property @{ Interval = 1500 }
 $pt.add_Tick({
+    # gauges
+    $script:gCpu.Value = Get-CpuUsage
+    $script:gCpu.Invalidate()
+    $script:gRam.Value = Get-RamUsage
+    $script:gRam.Invalidate()
+
+    # ping
     $script:sent++
     try {
         $r = $script:pg.Send($script:hostBox.Text, 400)
         if ($r.Status -eq 'Success') {
             $script:rtt.Add([double]$r.RoundtripTime)
-            if ($script:rtt.Count -gt 30) { $script:rtt.RemoveAt(0) }
+            if ($script:rtt.Count -gt 20) { $script:rtt.RemoveAt(0) }
+            $script:gPing.Value = [Math]::Min(100, $r.RoundtripTime)  # visual only
+            $script:gPing.Invalidate()
         } else { $script:lost++ }
     } catch { $script:lost++ }
     if ($script:rtt.Count) {
@@ -422,6 +642,8 @@ $pt.add_Tick({
         $script:pingLbl.Text = ("Ping {0} ms  •  range {1} ms  •  loss {2}%" -f `
             [math]::Round($m.Average), ($m.Maximum - $m.Minimum), [math]::Round(100 * $script:lost / $script:sent))
     }
+
+    # auto boost
     if ($script:Conf.Auto) {
         $f = Get-Process -Name 'FortniteClient-Win64-Shipping' -ErrorAction SilentlyContinue
         if ($f -and -not $script:boosted) { Boost-Game; $script:boosted = $true }
