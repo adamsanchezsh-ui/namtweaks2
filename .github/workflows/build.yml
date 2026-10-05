@@ -1,0 +1,20 @@
+name: Build exe
+on:
+  push:
+    branches: [main]
+    paths: ['namtweaks2-app.ps1']
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile with PS2EXE
+        shell: powershell
+        run: |
+          Install-Module ps2exe -Scope CurrentUser -Force
+          Invoke-PS2EXE -inputFile namtweaks2-app.ps1 -outputFile namtweaks2.exe -noConsole -requireAdmin -STA
+      - uses: actions/upload-artifact@v4
+        with:
+          name: namtweaks2-exe
+          path: namtweaks2.exe
