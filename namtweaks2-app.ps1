@@ -290,10 +290,25 @@ $logoSub = New-Object Windows.Forms.Label -Property @{
 }
 $side.Controls.AddRange(@($logo, $logoSub))
 
-$navHome = New-Object NavBtn; $navHome.Text = '  Home'; Left = 8; Top = 100; Width = 194
-$navCross = New-Object NavBtn; $navCross.Text = '  Crosshair'; Left = 8; Top = 146; Width = 194
-$navBoost = New-Object NavBtn; $navBoost.Text = '  Boosters'; Left = 8; Top = 192; Width = 194
+$navHome = New-Object NavBtn
+$navHome.Text = '  Home'
+$navHome.Left = 8
+$navHome.Top = 100
+$navHome.Width = 194
 $navHome.Active = $true
+
+$navCross = New-Object NavBtn
+$navCross.Text = '  Crosshair'
+$navCross.Left = 8
+$navCross.Top = 146
+$navCross.Width = 194
+
+$navBoost = New-Object NavBtn
+$navBoost.Text = '  Boosters'
+$navBoost.Left = 8
+$navBoost.Top = 192
+$navBoost.Width = 194
+
 $side.Controls.AddRange(@($navHome, $navCross, $navBoost))
 
 $status = New-Object Windows.Forms.Label -Property @{
